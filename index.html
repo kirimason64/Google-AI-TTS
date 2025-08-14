@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ứng dụng đọc thuyết minh bằng Google AI</title>
+  <link rel="stylesheet" href="index.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.13.0",
+    "mammoth": "https://esm.sh/mammoth@1.7.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <div id="login-overlay">
+    <div id="login-box">
+      <h2>Xác thực quyền truy cập</h2>
+      <p>Vui lòng nhập mật khẩu để sử dụng ứng dụng.</p>
+      <form id="login-form">
+        <div class="input-group">
+          <label for="password-input">Mật khẩu</label>
+          <input type="password" id="password-input" placeholder="Nhập mật khẩu của bạn" required>
+        </div>
+        <button type="submit" id="login-button">Đăng nhập</button>
+        <p id="login-error"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div id="input-panel">
+      <div class="panel-content-top">
+        <h1>Ứng dụng đọc thuyết minh bằng Google AI</h1>
+        <p class="description">Chọn nguồn dữ liệu từ Google Sheet, Google Doc hoặc nhập văn bản trực tiếp để tạo nội dung.</p>
+        
+        <div class="sharing-instructions">
+          <strong>Quan trọng:</strong>
+          <ul>
+            <li><strong>Google Sheet:</strong> Đi tới <strong>Tệp &gt; Chia sẻ</strong>, và dưới "Quyền truy cập chung", chọn <strong>"Bất kỳ ai có đường liên kết"</strong>.</li>
+            <li><strong>Google Doc:</strong> Để khắc phục lỗi API, bạn <strong>phải</strong> sử dụng tính năng "Xuất bản lên web". Đi tới <strong>Tệp &gt; Chia sẻ &gt; Xuất bản lên web</strong>, nhấn "Xuất bản", và sao chép đường liên kết được cung cấp.</li>
+          </ul>
+        </div>
+
+        <div class="input-method-selector">
+          <label><input type="radio" name="input-method" value="sheet" checked> Lấy từ Google Sheet</label>
+          <label><input type="radio" name="input-method" value="doc"> Lấy từ Google Doc</label>
+          <label><input type="radio" name="input-method" value="file"> Tải tệp lên</label>
+          <label><input type="radio" name="input-method" value="direct"> Nhập trực tiếp</label>
+        </div>
+
+        <div id="sheet-input-container" class="input-type-container">
+          <div class="input-group">
+            <label for="sheet-url">URL Google Sheet</label>
+            <input type="url" id="sheet-url" placeholder="https://docs.google.com/spreadsheets/d/...">
+          </div>
+  
+          <div class="input-group">
+            <label for="sheet-name">Tên trang tính</label>
+            <input type="text" id="sheet-name" placeholder="Trang tính1">
+          </div>
+  
+          <div class="input-group">
+            <label for="cell-ref">Ô</label>
+            <input type="text" id="cell-ref" placeholder="A1">
+          </div>
+        </div>
+
+        <div id="doc-input-container" class="input-type-container hidden">
+          <div class="input-group">
+            <label for="doc-url">URL Google Doc đã xuất bản</label>
+            <input type="url" id="doc-url" placeholder="https://docs.google.com/document/d/.../pub">
+          </div>
+        </div>
+
+        <div id="file-input-container" class="input-type-container hidden">
+          <div class="input-group">
+            <label for="file-upload">Chọn tệp văn bản</label>
+            <input type="file" id="file-upload" accept=".txt,.docx">
+            <p class="file-instructions">Hỗ trợ .txt, .docx. Tối đa 10MB.</p>
+          </div>
+        </div>
+
+        <div id="direct-input-container" class="input-type-container hidden">
+          <div class="input-group">
+            <label for="direct-text-input">Nhập văn bản trực tiếp</label>
+            <textarea id="direct-text-input" rows="8" placeholder="Dán hoặc gõ văn bản của bạn ở đây..." maxlength="10000"></textarea>
+            <div id="char-counter">0 / 10000</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="panel-content-bottom">
+        <button id="fetch-button">Lấy nội dung</button>
+        <div id="status" class="status-container" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div id="output-panel">
+      <div id="output-content">
+        <div class="output-column">
+          <div class="input-group text-display-group">
+              <label for="original-text-display">Nội dung văn bản nguyên mẫu</label>
+              <textarea id="original-text-display" readonly placeholder="Nội dung gốc từ tệp nguồn sẽ xuất hiện ở đây."></textarea>
+          </div>
+          <div class="input-group text-display-group">
+              <label for="text-display">Nội dung văn bản sau khi xử lí AI (có thể chỉnh sửa trong ô bên dưới)</label>
+              <textarea id="text-display" placeholder="Nội dung đã qua xử lý bởi AI sẽ xuất hiện ở đây."></textarea>
+          </div>
+        </div>
+        <div class="output-column">
+          <div class="tts-controls">
+              <div class="input-group">
+                  <label for="gemini-voice-select">Giọng đọc</label>
+                  <select id="gemini-voice-select" disabled>
+                    <option value="Zephyr">Zephyr (Nữ/Nam) - Tươi sáng</option>
+                    <option value="Puck">Puck (Nữ/Nam) - Lạc quan</option>
+                    <option value="Charon">Charon (Nam) - Giàu thông tin</option>
+                    <option value="Kore">Kore (Nữ/Nam) - Chắc chắn</option>
+                    <option value="Fenrir">Fenrir (Nam) - Dễ bị kích thích</option>
+                    <option value="Leda">Leda (Nữ) - Trẻ trung</option>
+                    <option value="Orus">Orus (Nam) - Chắc chắn</option>
+                    <option value="Aoede">Aoede (Nữ) - Nhẹ nhàng, thoải mái</option>
+                    <option value="Callirrhoe">Callirrhoe (Nữ) - Dễ chịu</option>
+                    <option value="Autonoe">Autonoe (Nữ) - Tươi sáng</option>
+                    <option value="Enceladus">Enceladus (Nữ/Nam) - Có hơi thở</option>
+                    <option value="Iapetus">Iapetus (Nam) - Rõ ràng</option>
+                    <option value="Umbriel">Umbriel (Nữ/Nam) - Dễ chịu</option>
+                    <option value="Algieba">Algieba (Nữ/Nam) - Mượt mà</option>
+                    <option value="Despina">Despina (Nữ) - Mượt mà</option>
+                    <option value="Erinome">Erinome (Nữ) - Rõ ràng</option>
+                    <option value="Algenib">Algenib (Nam) - Khàn</option>
+                    <option value="Rasalgethi">Rasalgethi (Nam) - Giàu thông tin</option>
+                    <option value="Laomedeia">Laomedeia (Nữ) - Lạc quan</option>
+                    <option value="Achernar">Achernar (Nữ) - Mềm mại</option>
+                    <option value="Alnilam">Alnilam (Nam) - Chắc chắn</option>
+                    <option value="Schedar">Schedar (Nữ/Nam) - Đều đặn</option>
+                    <option value="Gacrux">Gacrux (Nam) - Trưởng thành</option>
+                    <option value="Pulcherrima">Pulcherrima (Nữ) - Hướng ngoại</option>
+                    <option value="Achird">Achird (Nữ/Nam) - Thân thiện</option>
+                    <option value="Zubenelgenubi">Zubenelgenubi (Nữ/Nam) - Thân mật</option>
+                    <option value="Vindemiatrix">Vindemiatrix (Nữ) - Nhẹ nhàng</option>
+                    <option value="Sadachbia">Sadachbia (Nữ/Nam) - Sống động</option>
+                    <option value="Sadaltager">Sadaltager (Nam) - Tri thức</option>
+                    <option value="Sulafar">Sulafar (Nữ/Nam) - Ấm áp</option>
+                  </select>
+              </div>
+          </div>
+
+          <button id="generate-audio-button" disabled>Tạo Âm thanh</button>
+
+          <div id="audio-output" class="audio-output-container hidden">
+              <audio id="audio-player" controls></audio>
+              <a id="download-link" class="button" download="speech.wav">Tải xuống WAV</a>
+          </div>
+          
+          <div id="cover-image-panel">
+            <div class="input-group">
+              <label for="image-style-select">Phong cách ảnh bìa</label>
+              <select id="image-style-select" disabled>
+                <option value="Pop Art">Pop Art</option>
+                <option value="Watercolor">Watercolor</option>
+                <option value="Papercraft">Papercraft</option>
+                <option value="Street Art">Street Art</option>
+                <option value="Art Deco">Art Deco</option>
+                <option value="Fantasy Realism">Fantasy Realism</option>
+                <option value="Risograph">Risograph</option>
+                <option value="Anime Art">Anime Art</option>
+                <option value="Cyberpunk">Cyberpunk</option>
+                <option value="Photography">Photography</option>
+              </select>
+            </div>
+
+            <div class="control-row">
+              <div class="input-group">
+                <label for="image-aspect-ratio-select">Tỷ lệ</label>
+                <select id="image-aspect-ratio-select" disabled>
+                  <option value="16:9">16:9 (Ngang)</option>
+                  <option value="9:16">9:16 (Dọc)</option>
+                  <option value="1:1">1:1 (Vuông)</option>
+                  <option value="4:3">4:3 (Cổ điển)</option>
+                  <option value="3:4">3:4 (Dọc)</option>
+                </select>
+              </div>
+              
+              <div class="input-group">
+                <label for="image-resolution-select">Chất lượng</label>
+                <select id="image-resolution-select" disabled>
+                  <option value="standard">Bình thường</option>
+                  <option value="hd">Cao (HD)</option>
+                  <option value="4k">Siêu nét (4K)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label for="custom-image-prompt">Prompt tùy chỉnh (Không bắt buộc)</label>
+              <textarea id="custom-image-prompt" rows="2" placeholder="Để trống nếu muốn tự động tạo prompt từ văn bản nguyên mẫu..." disabled></textarea>
+            </div>
+
+            <button id="generate-image-button" disabled>Tạo ảnh bìa</button>
+            <div id="image-output" class="hidden">
+              <div id="image-loader">Tạo hình bằng AI</div>
+              <img id="cover-image" alt="Generated cover image" class="hidden">
+              <a id="download-image-link" class="button hidden" download="cover.png">Tải ảnh bìa</a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <div id="copyright-notice">Bản quyền phần mềm do Hoàng Trung Sơn tạo dựng</div>
+  </div>
+  <script type="module" src="index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

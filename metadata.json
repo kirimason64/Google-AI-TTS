@@ -1,0 +1,5 @@
+{
+  "name": "Ứng dụng đọc thuyết minh bằng Google AI",
+  "description": "Đọc nội dung từ một ô trong Google Sheet công khai và chuyển thành giọng nói bằng AI.",
+  "requestFramePermissions": []
+}
