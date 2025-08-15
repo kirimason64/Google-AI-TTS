@@ -7,12 +7,6 @@ import { GoogleGenAI } from "@google/genai";
 import mammoth from "mammoth";
 
 // --- DOM Elements ---
-const loginOverlay = document.getElementById('login-overlay') as HTMLDivElement;
-const loginForm = document.getElementById('login-form') as HTMLFormElement;
-const passwordInput = document.getElementById('password-input') as HTMLInputElement;
-const loginError = document.getElementById('login-error') as HTMLParagraphElement;
-const appDiv = document.getElementById('app') as HTMLDivElement;
-
 const sheetUrlInput = document.getElementById('sheet-url') as HTMLInputElement;
 const sheetNameInput = document.getElementById('sheet-name') as HTMLInputElement;
 const cellRefInput = document.getElementById('cell-ref') as HTMLInputElement;
@@ -54,32 +48,6 @@ const downloadImageLink = document.getElementById('download-image-link') as HTML
 const imageAspectRatioSelect = document.getElementById('image-aspect-ratio-select') as HTMLSelectElement;
 const imageResolutionSelect = document.getElementById('image-resolution-select') as HTMLSelectElement;
 const customImagePrompt = document.getElementById('custom-image-prompt') as HTMLTextAreaElement;
-
-
-// --- Authentication ---
-const CORRECT_PASSWORD = 'Sos@18006558';
-
-if (sessionStorage.getItem('isAuthenticated') === 'true') {
-  loginOverlay.classList.add('hidden');
-  appDiv.classList.remove('hidden');
-} else {
-  // HTML defaults to showing login and hiding app, so we just attach the listener
-  loginForm.addEventListener('submit', (event: Event) => {
-    event.preventDefault();
-    if (passwordInput.value === CORRECT_PASSWORD) {
-      sessionStorage.setItem('isAuthenticated', 'true');
-      loginOverlay.style.opacity = '0';
-      setTimeout(() => {
-        loginOverlay.classList.add('hidden');
-      }, 300); // Match CSS transition duration
-      appDiv.classList.remove('hidden');
-    } else {
-      loginError.textContent = 'Mật khẩu không đúng. Vui lòng thử lại.';
-      passwordInput.value = '';
-      passwordInput.focus();
-    }
-  });
-}
 
 
 // --- API Key & Prompt Management ---
